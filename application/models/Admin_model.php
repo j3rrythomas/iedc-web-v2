@@ -14,9 +14,32 @@ class Admin_model extends CI_Model
     }
     return FALSE;
   }
+
   public function is_super_admin($email)
   {
     $this->db->where('type', 'S');
+    $this->db->where('email', $email);
+    $query = $this->db->get('admin_users');
+    if ($query->num_rows() == 1) {
+      return TRUE;
+    }
+    return FALSE;
+  }
+
+  public function is_default_admin($email)
+  {
+    $this->db->where('type', 'U');
+    $this->db->where('email', $email);
+    $query = $this->db->get('admin_users');
+    if ($query->num_rows() == 1) {
+      return TRUE;
+    }
+    return FALSE;
+  }
+
+  public function is_local_admin($email)
+  {
+    $this->db->where('type', 'L');
     $this->db->where('email', $email);
     $query = $this->db->get('admin_users');
     if ($query->num_rows() == 1) {
@@ -117,13 +140,13 @@ class Admin_model extends CI_Model
       print_r($error);
       exit;
       $this->session->set_flashdata('fail', 'Some error has been occured!');
-      redirect("admin/dashboard/edit-maker-library");
+      redirect("admin/dashboard/add-new-maker-component");
     } else {
       // print_r($data);
       $data['img_link'] = $file_name;
       $this->db->insert('maker_library', $data);
       $this->session->set_flashdata('success', 'Successfully added one component!');
-      redirect("admin/dashboard/edit-maker-library");
+      redirect("admin/dashboard/add-new-maker-component");
     }
   }
 
@@ -188,5 +211,71 @@ class Admin_model extends CI_Model
       $this->session->set_flashdata('success', 'Success!');
       redirect('admin/dashboard/volunteer-database');
     }
+  }
+
+  function get_all_maker_components()
+  {
+    $query = $this->db->get('maker_library');
+    return $query->result_array();
+  }
+
+
+  function updateMakerComponent($data)
+  {
+    $this->db->where('comp_num', $data['comp_num']);
+    $temp = array(
+      'name' => $data['comp_name'],
+      'total_count' => $data['total_count']
+    );
+    $query = $this->db->update('maker_library', $temp);
+    return true;
+  }
+
+  function get_all_new_membership_reg()
+  {
+    $query = $this->db->get('member_registration20');
+    return $query->result_array();
+  }
+
+  function white_list_user($reg_id)
+  {
+    $this->db->where('reg_id', $reg_id);
+    $query = $this->db->get('member_registration20');
+    $user = $query->row();
+    $data['email'] = $user->email;
+    $data['user_hash'] = password_hash($user->email, PASSWORD_BCRYPT);
+    $email = $user->email;
+    $query1 = $this->db->get_where('userRegister', "email='$email'");
+    $temp = $query1->num_rows();
+    if ($temp != TRUE) {
+      $this->db->insert('userRegister', $data);
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  function verify_membership_registration($reg_id)
+  {
+    $this->db->where('reg_id', $reg_id);
+    $temp = array(
+      'is_verified' => '1',
+      'verified_user' => $this->session->email
+    );
+    $query = $this->db->update('member_registration20', $temp);
+    if ($this->db->affected_rows() == 1) {
+      $response = $this->white_list_user($reg_id);
+      $data = array(
+        'status' => true,
+        'session_user' => $this->session->email,
+        'white_list_status' => $response
+      );
+    } else {
+      $data = array(
+        'status' => false
+      );
+    }
+    header('Content-Type: application/json');
+    echo json_encode($data);
   }
 }
